@@ -39,18 +39,22 @@
 float m7_1_data[20] = {0};
 //地址变动50*4=200byte,0x28001000 + 200(C8)
 
-uint8_t scrren_flag = 0;
+#define M0_speed m7_1_data[0]
+#define M1_speed m7_1_data[1]
+#define motor_flag m7_1_data[2]//电机标志位 
+#define Battery_V m7_1_data[3]
+#define EncoderL m7_1_data[4]
+#define EncoderR m7_1_data[5]
 
 void Baterry_ChecK(){
-  if(m7_1_data[10]>= 6  &&  m7_1_data[10] <= 7.2 )//对于2S电池而言(6~7.2警告)
+  if(Battery_V>= 6  &&  Battery_V <= 7.3 )//对于2S电池而言(6~732警告)
     gpio_toggle_level(P19_4);
-  else if(m7_1_data[10]>= 9  &&  m7_1_data[10] <= 10.8 )//对于3S电池而言9~10.8警告)
+  else if(Battery_V >= 9  &&  Battery_V <= 10.8 )//对于3S电池而言9~10.8警告)
     gpio_toggle_level(P19_4);
 }
 
 int main(void)
 {
-    static uint32_t speed;              //m7_1_data的运行速度
     clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
     debug_info_init();                  // 调试串口信息初始化
     
@@ -63,44 +67,32 @@ int main(void)
   
     //定时器初始化
     timer_init(TC_TIME2_CH1, TIMER_US);//打开定时器测速单位us   
-    timer_init(TC_TIME2_CH0, TIMER_US);//us
+    timer_init(TC_TIME2_CH0, TIMER_US);//打开定时器测速单位us   
 
+    //编码器初始化
+    encoder_quad_init(TC_CH07_ENCODER, TC_CH07_ENCODER_CH1_P07_6, TC_CH07_ENCODER_CH2_P07_7);
+    encoder_quad_init(TC_CH20_ENCODER, TC_CH20_ENCODER_CH1_P08_1, TC_CH20_ENCODER_CH2_P08_2);
+    
+    //中断初始化
+    pit_ms_init(PIT_CH0, 10);//初始化 PIT0 为周期中断 10ms
+    
     adc_init(ADC0_CH00_P06_0, ADC_12BIT); //检测电池电压
     while(true)
     {
         timer_clear(TC_TIME2_CH1);
         timer_start(TC_TIME2_CH1);
         SCB_CleanInvalidateDCache_by_Addr(&m7_1_data, sizeof(m7_1_data));//更新RAM数据
-        Baterry_ChecK();                                //检测电池电压
+        Baterry_ChecK();                                                  //检测电池电压
         ///////////////////////////////////////测速区间///////////////////////////////////////////
         
-        m7_1_data[3] = (float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1;
+        Battery_V = (float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1;
         
-        if(m7_1_data[2] == 1){//如果打开了电机，那么第二个核心介入管理屏幕
-            if(scrren_flag == 0){
-              ips200_init(IPS200_TYPE_PARALLEL8);//屏幕初始化
-              ips200_Printf(190,0,(ips200_font_size_enum)0,"Battery");
-              ips200_Printf(0,300,(ips200_font_size_enum)0,"M1:");       //第一个核心的速度
-              ips200_Printf(80,300,(ips200_font_size_enum)0,"M2:");//第二个核心运行速度显示运行速度
-              ips200_Printf(0,152,(ips200_font_size_enum)0,"threshold:");//摄像头曝光度
-              ips200_Printf(0,160,(ips200_font_size_enum)0,"Moter_V:");//电机初始速度
-              ips200_Printf(0,168,(ips200_font_size_enum)0,"motor:");// 电机使能
-              ips200_Printf(0,216,(ips200_font_size_enum)0,"pid:");//显示PID转向环
-              ips200_Printf(0,288,(ips200_font_size_enum)0,"EncoderL:");//左边编码器值
-              ips200_Printf(120,288,(ips200_font_size_enum)0,"EncoderR:");//右边编码器值
-              scrren_flag = 1;
-            }
-            ips200_Printf(190,8,(ips200_font_size_enum)1,"%.2fV ",(float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1);//显示电池电压
-            ips200_Printf(24,216,(ips200_font_size_enum)0,"%.1f ",m7_1_data[7]);//显示PID转向环
-            ips200_Printf(0,272,(ips200_font_size_enum)0,"pidL:%d ",(uint32_t)m7_1_data[8]);//显示L边电机pwm值
-            ips200_Printf(120,272,(ips200_font_size_enum)0,"pidR:%d ",(uint32_t)m7_1_data[9]);//显示R边电机pwm值  
-            ips200_Printf(20,300,(ips200_font_size_enum)0,"%d ",(uint32_t)m7_1_data[0]);//显示运行速度
-            ips200_Printf(100,300,(ips200_font_size_enum)0,"M2:%d ",speed);//第二个核心运行速度显示运行速度
+        if(motor_flag == 1){//如果打开了电机
+
         }
         
         //////////////////////////////////////测速区间//////////////////////////////////////////
-        speed = timer_get(TC_TIME2_CH1);
-        m7_1_data[1] = speed;
+        M1_speed = timer_get(TC_TIME2_CH1);
         timer_stop(TC_TIME2_CH1);
     }
 }

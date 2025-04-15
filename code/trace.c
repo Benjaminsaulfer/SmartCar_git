@@ -17,7 +17,7 @@ typedef enum Diraction{
   Left
 }Diraction;
 ///////中点////////
-int16_t remenber_point = 94;
+uint8_t remenber_point = 94;
 
 uint8 Binary_map[188][120];//binary map
 
@@ -29,69 +29,64 @@ void Screen_Add(uint8 threshold){
   //画出扫线扫到的中点(x,80)
   if(remenber_point>1 && remenber_point<187)
     ips200_draw_big_point(remenber_point,80,RGB565_PURPLE);
-  else if(remenber_point<=1)
+  else if(remenber_point<=1)//限位保护
     ips200_draw_big_point(0,80,RGB565_PURPLE);
-  else if(remenber_point>=187)
+  else if(remenber_point>=187)//限位保护
     ips200_draw_big_point(187,80,RGB565_PURPLE);
   //ips200_draw_line(34,110,154,110,RGB565_YELLOW);//画出扫描基准线X 34~110
+
   
   if(mt9v03x_finish_flag){
        mt9v03x_finish_flag= 0;
        ips200_show_gray_image(0, 0, mt9v03x_image[0], MT9V03X_W, MT9V03X_H, 188, 120, threshold);//循环刷新出二值化图形
   }
+  //////////////////////矩形扫描/////////////////////////////
+  //直线循迹
+  ips200_draw_rectangle(rectangleL,RGB565_RED);
+  ips200_draw_rectangle(rectangleR,RGB565_RED);
+  //弯道循迹
+  ips200_draw_rectangle(rectangleLL,RGB565_RED);
+  ips200_draw_rectangle(rectangleRR,RGB565_RED);
+
    //////////////////////扫线线扫描/////////////////////////////
+  /*
   for(uint8_t x = 0,y=110;x<lengthX_L;x++,y--){
     ips200_draw_point(PointX_L[x],y,RGB565_RED);
   }
   for(uint8_t x = 0,y=110;x<lengthX_R;x++,y--){
     ips200_draw_point(PointX_R[x],y,RGB565_RED);
   }
-  
-   ///////////////////////扫线扫描////////////////////////////
-   
-   /*//////////////////////八邻域扫描///////////////////////// 
-   for(int i = 0;i<Fileds_len;i++)//画出边界线
-   {
-     ips200_draw_point(eight_fields_x[i],eight_fields_y[i],RGB565_RED);
-   }
-   for(int i = 0;i<Fileds_len/2;i++)//draw middle line画出中线
-   {
-     ips200_draw_point((eight_fields_x[i]+eight_fields_x[(uint8)(Fileds_len/2) + i])/2
+
+   */
+   //////////////////////八邻域扫描///////////////////////// 
+  /*
+  for(int i = 0;i<Fileds_len;i++)//画出边界线
+  {
+    ips200_draw_point(eight_fields_x[i],eight_fields_y[i],RGB565_RED);
+  }
+  for(int i = 0;i<Fileds_len/2;i++)//draw middle line画出中线
+  {
+    ips200_draw_point((eight_fields_x[i]+eight_fields_x[(uint8)(Fileds_len/2) + i])/2
                       ,(eight_fields_y[i]+eight_fields_y[(uint8)(Fileds_len/2) + i])/2,RGB565_GREEN); //draw middle line
-   }
-   *///////////////////////八邻域扫描//////////////////////
+  }
+  */
 }
 ////////////////////////////////////////////二值化图像/////////////////////////////////////////////////
 //直接阈值二值化
-void binarizeImage(uint8 threshold) {
+void binarizeImage(uint8_t ZIP,uint8 threshold) {
   //scan all the gray map then convert it intp binary map
-  for (uint8_t y = 0; y < 120; y++) {
-    for(uint8_t x =0;x<188;x++){
+  for (uint8_t y = 0; y < 120; y+=ZIP) {
+    for(uint8_t x =0;x<188;x+=ZIP){
        //if lager than threshold we will turn this pixel to white else black
        if(mt9v03x_image[y][x] >= threshold)Binary_map[x][y] = 1;   //  white 1
        else Binary_map[x][y] = 0;          //  black 0
     }
   }
 }
-//图像压缩
-void binarizeImage_ZIP(uint8 threshold) {
-  //scan all the gray map then convert it intp binary map
-  uint8_t bin_x = 0,bin_y = 0;;
-  for (uint8_t y = 0; y < 120; y+=2) {
-       bin_y++;
-    for(uint8_t x =0;x<188;x+=2){
-       bin_x++;
-       //if Pixel lager than threshold we will turn this pixel to white else black
-       if(mt9v03x_image[y][x] >= threshold)Binary_map[bin_x][bin_y] = 1;   //  white 1
-       else Binary_map[bin_x][bin_y] = 0;                                    //  black 0
-    }
-  }
-}
 
-/*动态自适应算法:大津法
-image:传入图像
-*/
-int otsu_threshold(unsigned char *image) {
+//动态自适应算法:大津法
+//image:传入图像
+uint16_t otsu_threshold(unsigned char *image) {
     int hist[256] = {0};
     double sum = 0;
     double sumB = 0;
@@ -235,4 +230,30 @@ void Trace_Eight_fields_new(){
              }                                       
         }
     }
+}
+
+uint8_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
+  uint8_t counter = 0;
+  for(uint8_t Y =y1;Y<y2;Y++){
+    for(uint8_t X = x1;X<x2;X++){
+      if(Binary_map[X][Y]==1)counter++;
+    }
+  }
+  return counter;
+}
+/*差比和算法
+L1:左边矩形(靠近中线)
+L2:左边矩形
+R1:右边矩形(靠近中线)
+R2:右边矩形
+*/
+float Sum_of_Dif(float L1,float R1,float L2,float R2){
+  static float weight = 1;
+  if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
+  return ((R1 - R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
+}
+
+void Trace_rectangle(){
+  
+  
 }

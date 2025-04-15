@@ -4,11 +4,12 @@
 extern uint8 remenber_point;
 extern int16 EncoderL;
 extern int16 EncoderR;
-extern uint8 motor_flag;
 extern uint16_t motor_base;
 extern int16 Max_encoderL;//编码器最大速度
 extern int16 Max_encoderR;
 
+extern float m7_1_data[20];
+#define motor_flag m7_1_data[2]//电机标志位 
 
 //电机初始化
 void  moter_init(){
@@ -74,7 +75,7 @@ float  PID_Increse(PID* pid,float current_value){
 
 /*
 PID*             传入PID的结构体
-current_value    当前的位置
+current_value    当前的位置(或者当前误差)
 */
 float PID_location(PID *pid, float current_value) {
     float error = pid->target - current_value;  // 当前误差
@@ -91,11 +92,11 @@ float PID_location(PID *pid, float current_value) {
 }
 
 //方向环
-void   Steering_FeedBack(PID * pid){
+void   Steering_FeedBack(PID * pid,float Error){
   static int input = 0;
   static int Rinput = 0;
   static int Linput = 0;
-  input = (int)PID_location(pid,remenber_point);
+  input = (int)PID_location(pid,Error);
   Rinput = motor_base+input;
   Linput = motor_base-input;
   //Protect限位保护
@@ -104,14 +105,13 @@ void   Steering_FeedBack(PID * pid){
   if(Linput>=10000)Linput = 10000;
   else if(Linput<=0)Linput=0;
   //把PID输出值传入PWM
-  if(motor_flag){
+  if(motor_flag == 1.0f){
     pwm_set_duty(MoterR, Rinput);
     pwm_set_duty(MoterL, Linput);
   }else{
     pwm_set_duty(MoterR, 0);
     pwm_set_duty(MoterL, 0);
   }
-
 }
 
 //速度环
@@ -166,7 +166,7 @@ void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R){
   else if(SpeedPID_R <=0)SpeedPID_R = 0;
   
   //将速度环pidOUT分别输出在电机上
-  if(motor_flag){
+  if(motor_flag == 1.0f){
     pwm_set_duty(MoterR, (uint16_t)SpeedPID_L->OUT);
     pwm_set_duty(MoterL, (uint16_t)SpeedPID_R->OUT);
   }else{
@@ -193,7 +193,6 @@ void Encoder_Get_Max(int16* Encoder_L,int16* Encoder_R){
       pwm_set_duty(MoterL, 10000);
       onece_flag = 0;
     }
-
     if(EncoderL>*Encoder_L)
       *Encoder_L = EncoderL;
     if(EncoderR>*Encoder_R)

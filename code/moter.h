@@ -29,7 +29,7 @@ float  PID_Increse(PID* pid,float current_value);             //增加量式PID
 float  PID_location(PID *pid, float current_value);           //位置式PID
 
 ////////////////////////应用型PID/////////////////////////
-void   Steering_FeedBack(PID * pid);                          //转向环
+void   Steering_FeedBack(PID * pid,float Erro);             //转向环
 void   Speed_FeedBack(PID * pid,Moter_WHO moter);             //速度环
 void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R);   //串级PID (转向环，速度环)  
 
