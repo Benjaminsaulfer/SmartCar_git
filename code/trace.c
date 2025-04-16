@@ -35,7 +35,6 @@ void Screen_Add(uint8 threshold){
     ips200_draw_big_point(187,80,RGB565_PURPLE);
   //ips200_draw_line(34,110,154,110,RGB565_YELLOW);//画出扫描基准线X 34~110
 
-  
   if(mt9v03x_finish_flag){
        mt9v03x_finish_flag= 0;
        ips200_show_gray_image(0, 0, mt9v03x_image[0], MT9V03X_W, MT9V03X_H, 188, 120, threshold);//循环刷新出二值化图形
@@ -248,9 +247,9 @@ R1:右边矩形(靠近中线)
 R2:右边矩形
 */
 float Sum_of_Dif(float L1,float R1,float L2,float R2){
-  static float weight = 1;
+  static float weight = 2;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
-  return ((R1 - R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
+  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
 }
 
 void Trace_rectangle(){

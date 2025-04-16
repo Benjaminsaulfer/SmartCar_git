@@ -4,10 +4,10 @@
 #include "math.h"
 
 //一下为矩形坐标
-#define rectangleL 60,90,90,100
-#define rectangleR 98,90,128,100
-#define rectangleLL 20,70,60,76
-#define rectangleRR 128,70,168,76
+#define rectangleL 68,90,92,100
+#define rectangleR 96,90,120,100
+#define rectangleLL 30,78,60,86
+#define rectangleRR 128,78,158,86
 
 extern uint8 Binary_map[188][120];//binary map
 extern uint8_t remenber_point;//记录八邻域扫出来的中点

@@ -34,6 +34,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "trace.h"
 
 #pragma location = 0x28001000
 float m7_1_data[20] = {0};
@@ -51,6 +52,8 @@ void Baterry_ChecK(){
     gpio_toggle_level(P19_4);
   else if(Battery_V >= 9  &&  Battery_V <= 10.8 )//对于3S电池而言9~10.8警告)
     gpio_toggle_level(P19_4);
+  else
+    gpio_set_level(P19_4,0);
 }
 
 int main(void)
@@ -75,7 +78,7 @@ int main(void)
     
     //中断初始化
     pit_ms_init(PIT_CH0, 10);//初始化 PIT0 为周期中断 10ms
-    
+
     adc_init(ADC0_CH00_P06_0, ADC_12BIT); //检测电池电压
     while(true)
     {
