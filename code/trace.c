@@ -74,7 +74,7 @@ void Screen_Add(uint8 threshold){
 //直接阈值二值化
 void binarizeImage(uint8_t ZIP,uint8 threshold) {
   //scan all the gray map then convert it intp binary map
-  for (uint8_t y = 0; y < 120; y+=ZIP) {
+  for (uint8_t y = 60; y < 120; y+=ZIP) {
     for(uint8_t x =0;x<188;x+=ZIP){
        //if lager than threshold we will turn this pixel to white else black
        if(mt9v03x_image[y][x] >= threshold)Binary_map[x][y] = 1;   //  white 1
@@ -240,6 +240,20 @@ uint8_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
   }
   return counter;
 }
+float turn_plus(float L1,float R1)
+{
+  uint8_t sum_amount = 160;
+    if (L1 == 0 && R1 >= (1/2)*sum_amount)
+    {
+      return 0.3;
+    }
+    if (R1 == 0 && L1 >= (1/2)*sum_amount)
+    {
+      return -0.3;
+    }
+    return 0;
+
+}
 /*差比和算法
 L1:左边矩形(靠近中线)
 L2:左边矩形
@@ -247,9 +261,9 @@ R1:右边矩形(靠近中线)
 R2:右边矩形
 */
 float Sum_of_Dif(float L1,float R1,float L2,float R2){
-  static float weight = 2;
+  static float weight = 2.5;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
-  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
+  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
 }
 
 void Trace_rectangle(){
