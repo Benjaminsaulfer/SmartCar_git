@@ -203,7 +203,14 @@ int main(void)
         //Speed_FeedBack(&PID_Speed_R,Right);//右电机速度环
         //Speed_FeedBack(&PID_Speed_L,Left);//左电机速度环
         //Cascade_FeedBack(&PID_Steering,&PID_Speed_L,&PID_Speed_R);//串级PID
+        if (motor_flag == 1)
+        {
+            if (Lnum== 0 && Rnum== 0 && LLnum== 0 && RRnum== 0)
+            {
+              motor_flag = 0;
+            }
         
+        }
         /////////////////////////////////////////测速区间/////////////////////////////////////////////////
         ips200_Printf(20,300,(ips200_font_size_enum)0,"%d ",(uint32_t)M0_speed);//显示第一个核心运行速度
         ips200_Printf(100,300,(ips200_font_size_enum)0,"%d ",(uint32_t)M1_speed);//显示第二个核心运行速度
