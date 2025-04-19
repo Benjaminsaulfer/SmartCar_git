@@ -22,7 +22,8 @@ uint8_t remenber_point = 94;
 uint8 Binary_map[120][188];//binary map
 
 void Show_Binaray_map(){//显示二值化数组
-  ips200_show_binary_map(0, 0, Binary_map[0]);
+  //画出二值化数组
+  ips200_show_binary_map(Binary_map[0]);
    //直线循迹
   ips200_draw_rectangle(rectangleL,RGB565_RED);
   ips200_draw_rectangle(rectangleR,RGB565_RED);
@@ -241,6 +242,12 @@ void Trace_Eight_fields_new(){
     }
 }
 
+void WhitePoint_amount(Rectangle_Struct* this){
+  this->L = White_amount(rectangleL);
+  this->R = White_amount(rectangleR);
+  this->LL = White_amount(rectangleLL);
+  this->RR = White_amount(rectangleRR);
+}
 
 //计算白点数量:
 uint8_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
@@ -277,4 +284,9 @@ float Sum_of_Dif(float L1,float R1,float L2,float R2){
   static float weight = 2.5;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
   return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
+}
+
+float Sum_of_Dif_near(float L1,float R1){
+  if((L1 + R1)==0)return 0;//如果分母为0
+  return (R1  - L1 ) / (L1 + R1 );
 }
