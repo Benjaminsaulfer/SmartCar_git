@@ -867,6 +867,41 @@ void ips200_show_float (uint16 x, uint16 y, const double dat, uint8 num, uint8 p
     ips200_show_string(x, y, data_buffer);
 }
 
+void transpose(uint8 array[188][120], uint8 new_array[120][188]) {
+    for (uint16_t i = 0; i < 188; i++) {
+        for (uint16_t j = 0; j < 120; j++) {
+            new_array[j][i] = array[i][j];
+        }
+    }
+}
+
+void ips200_show_binary_map(uint16 x, uint16 y, const uint8 *image){
+    uint32 i = 0, j = 0;
+    uint16 temp = 0;
+    uint16 data_buffer[240];
+    uint8_t height = 120;
+    uint8_t width = 188;
+    const uint8 *image_temp;
+
+    IPS200_CS(0);//打开片选
+    ips200_set_region(x, y, x + 187, y + 119);             // 设置显示区域
+
+    for(j = 0; j < 120; j ++)
+    {
+        image_temp = image + j * height / 120 * width;                   // 直接对 image 操作会 Hardfault 暂时不知道为什么
+        for(i = 0; i < 188; i ++)
+        {
+            temp = *(image_temp + i * width / 188);                       // 读取像素点
+            if(temp < 1)
+                data_buffer[i] = (RGB565_BLACK);
+            else
+                data_buffer[i] = (RGB565_WHITE);
+        }
+        ips200_write_16bit_data_array(data_buffer, 188);
+    }
+    IPS200_CS(1);//关闭片选
+}
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     IPS200 显示二值图像 数据每八个点组成一个字节数据
 // 参数说明     x               坐标x方向的起点 参数范围 [0, ips200_width_max-1]
