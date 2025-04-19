@@ -52,8 +52,6 @@ void Baterry_ChecK(){
     gpio_toggle_level(P19_4);
   else if(Battery_V >= 9  &&  Battery_V <= 10.8 )//对于3S电池而言9~10.8警告)
     gpio_toggle_level(P19_4);
-  else
-    gpio_set_level(P19_4,0);
 }
 
 int main(void)
@@ -89,7 +87,6 @@ int main(void)
         ///////////////////////////////////////测速区间///////////////////////////////////////////
         
         Battery_V = (float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1;
-        
         if(motor_flag == 1){//如果打开了电机
 
         }
