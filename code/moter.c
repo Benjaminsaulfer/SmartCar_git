@@ -18,6 +18,10 @@ void  moter_init(){
     pwm_init(MoterL, 1000, 0);//Init_PWM 
     pwm_init(MoterR, 1000, 0);//Init_PWM
 }
+void Check_Top(){
+
+}
+
 
 /*PID_init()初始化函数
 PID* pid  传入PID结构体

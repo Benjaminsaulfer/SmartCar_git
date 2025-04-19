@@ -19,7 +19,17 @@ typedef enum Diraction{
 ///////中点////////
 uint8_t remenber_point = 94;
 
-uint8 Binary_map[188][120];//binary map
+uint8 Binary_map[120][188];//binary map
+
+void Show_Binaray_map(){//显示二值化数组
+  ips200_show_binary_map(0, 0, Binary_map[0]);
+   //直线循迹
+  ips200_draw_rectangle(rectangleL,RGB565_RED);
+  ips200_draw_rectangle(rectangleR,RGB565_RED);
+  //弯道循迹
+  ips200_draw_rectangle(rectangleLL,RGB565_RED);
+  ips200_draw_rectangle(rectangleRR,RGB565_RED);
+};
 
 //在屏幕上显示出其它数据
 void Screen_Add(uint8 threshold){
@@ -75,10 +85,10 @@ void Screen_Add(uint8 threshold){
 void binarizeImage(uint8_t ZIP,uint8 threshold) {
   //scan all the gray map then convert it intp binary map
   for (uint8_t y = 60; y < 120; y+=ZIP) {
-    for(uint8_t x =0;x<188;x+=ZIP){
+    for(uint8_t x = 0;x<188;x+=ZIP){
        //if lager than threshold we will turn this pixel to white else black
-       if(mt9v03x_image[y][x] >= threshold)Binary_map[x][y] = 1;   //  white 1
-       else Binary_map[x][y] = 0;          //  black 0
+       if(mt9v03x_image[y][x] >= threshold)Binary_map[y][x] = 1;   //  white 1
+       else Binary_map[y][x] = 0;          //  black 0
     }
   }
 }
@@ -231,15 +241,18 @@ void Trace_Eight_fields_new(){
     }
 }
 
+
+//计算白点数量:
 uint8_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
   uint8_t counter = 0;
   for(uint8_t Y =y1;Y<y2;Y++){
     for(uint8_t X = x1;X<x2;X++){
-      if(Binary_map[X][Y]==1)counter++;
+      if(Binary_map[Y][X]==1)counter++;
     }
   }
   return counter;
 }
+
 float turn_plus(float L1,float R1)
 {
   uint8_t sum_amount = 160;
@@ -252,8 +265,8 @@ float turn_plus(float L1,float R1)
       return -0.3;
     }
     return 0;
-
 }
+
 /*差比和算法
 L1:左边矩形(靠近中线)
 L2:左边矩形
@@ -264,9 +277,4 @@ float Sum_of_Dif(float L1,float R1,float L2,float R2){
   static float weight = 2.5;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
   return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
-}
-
-void Trace_rectangle(){
-  
-  
 }

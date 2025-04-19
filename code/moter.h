@@ -23,6 +23,7 @@ typedef enum {
 }Moter_WHO;
 
 void   moter_init();//电机初始化
+void   Check_Stop();
 ///////////////////////底层PID函数////////////////////////
 void   PID_init(PID* pid,float Kp,float Ki,float Kd,float target);
 float  PID_Increse(PID* pid,float current_value);             //增加量式PID

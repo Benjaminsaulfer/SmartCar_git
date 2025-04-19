@@ -179,12 +179,14 @@ int main(void)
         uint8_t Rnum = White_amount(rectangleR);
         uint8_t LLnum = White_amount(rectangleLL);
         uint8_t RRnum = White_amount(rectangleRR);
-        ips200_Printf(180,180,(ips200_font_size_enum)0,"%.2f ",Sum_of_Dif(Lnum,Rnum,LLnum,RRnum));
         
+        ips200_Printf(180,180,(ips200_font_size_enum)0,"%.2f ",Sum_of_Dif(Lnum,Rnum,LLnum,RRnum));
+        ips200_Printf(160,200,(ips200_font_size_enum)0,"%d ",LLnum);
+        ips200_Printf(200,200,(ips200_font_size_enum)0,"%d ",RRnum);
         if(motor_flag == 0){//如果电机没有打开允许屏幕运行
-            Screen_Add(threshold);//显示屏添加
+            //Screen_Add(threshold);//显示屏添加化图形
+            Show_Binaray_map();//显示实际二值化图像
             ips200_Printf(80,ArrowPos,(ips200_font_size_enum)0,"<<");
-            
             ips200_Printf(188,8,(ips200_font_size_enum)1,"%.2fV",Battery_V);//显示电池电压
             ips200_Printf(50,168,(ips200_font_size_enum)0,"%d",(uint32_t)motor_flag);// 电机使能
             ips200_Printf(0,128,(ips200_font_size_enum)0,"Kp:%.1f ",PID_Steering.Kp);//kp
@@ -203,6 +205,7 @@ int main(void)
         //Speed_FeedBack(&PID_Speed_R,Right);//右电机速度环
         //Speed_FeedBack(&PID_Speed_L,Left);//左电机速度环
         //Cascade_FeedBack(&PID_Steering,&PID_Speed_L,&PID_Speed_R);//串级PID
+
         if (motor_flag == 1)
         {
             if (Lnum== 0 && Rnum== 0 && LLnum== 0 && RRnum== 0)
@@ -211,6 +214,7 @@ int main(void)
             }
         
         }
+        
         /////////////////////////////////////////测速区间/////////////////////////////////////////////////
         ips200_Printf(20,300,(ips200_font_size_enum)0,"%d ",(uint32_t)M0_speed);//显示第一个核心运行速度
         ips200_Printf(100,300,(ips200_font_size_enum)0,"%d ",(uint32_t)M1_speed);//显示第二个核心运行速度
