@@ -8,8 +8,7 @@ extern uint16_t motor_base;
 extern int16 Max_encoderL;//编码器最大速度
 extern int16 Max_encoderR;
 
-extern float m7_1_data[20];
-#define motor_flag m7_1_data[2]//电机标志位 
+extern uint8 motor_flag;
 
 //电机初始化
 void  moter_init(){
@@ -18,10 +17,6 @@ void  moter_init(){
     pwm_init(MoterL, 1000, 0);//Init_PWM 
     pwm_init(MoterR, 1000, 0);//Init_PWM
 }
-void Check_Top(){
-
-}
-
 
 /*PID_init()初始化函数
 PID* pid  传入PID结构体

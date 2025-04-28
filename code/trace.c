@@ -85,7 +85,7 @@ void Screen_Add(uint8 threshold){
 //直接阈值二值化
 void binarizeImage(uint8_t ZIP,uint8 threshold) {
   //scan all the gray map then convert it intp binary map
-  for (uint8_t y = 60; y < 120; y+=ZIP) {
+  for (uint8_t y = 0; y < 120; y+=ZIP) {
     for(uint8_t x = 0;x<188;x+=ZIP){
        //if lager than threshold we will turn this pixel to white else black
        if(mt9v03x_image[y][x] >= threshold)Binary_map[y][x] = 1;   //  white 1
@@ -250,8 +250,8 @@ void WhitePoint_amount(Rectangle_Struct* this){
 }
 
 //计算白点数量:
-uint8_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
-  uint8_t counter = 0;
+uint16_t White_amount(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2){
+  uint16_t counter = 0;
   for(uint8_t Y =y1;Y<y2;Y++){
     for(uint8_t X = x1;X<x2;X++){
       if(Binary_map[Y][X]==1)counter++;
@@ -283,7 +283,8 @@ R2:右边矩形
 float Sum_of_Dif(float L1,float R1,float L2,float R2){
   static float weight = 2.5;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
-  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
+  //return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
+  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
 }
 
 float Sum_of_Dif_near(float L1,float R1){
