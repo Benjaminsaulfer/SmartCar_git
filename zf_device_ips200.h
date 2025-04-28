@@ -159,10 +159,12 @@ void    ips200_full                     (const uint16 color);                   
 void    ips200_set_dir                  (ips200_dir_enum dir);                                                                 // IPS200 设置显示方向
 void    ips200_set_font                 (ips200_font_size_enum font);                                                          // IPS200 设置显示字体
 void    ips200_set_color                (const uint16 pen, const uint16 bgcolor);                                              // IPS200 设置显示颜色
+void    ips200_pen_color                (const uint16 pen);
 void    ips200_draw_point               (uint16 x, uint16 y, const uint16 color);                                              // IPS200 画点函数
 void    ips200_draw_line                (uint16 x_start, uint16 y_start, uint16 x_end, uint16 y_end, const uint16 color);      // IPS200 画线函数
 void    ips200_draw_big_point           (uint16 x, uint16 y, const uint16 color);                                               //画大点
 void    ips200_draw_rectangle           (uint16 x1, uint16 y1,uint16 x2, uint16 y2, const uint16 color);                     //画矩形
+
 
 void    ips200_show_char                (uint16 x, uint16 y, const char dat);
 void    ips200_show_string              (uint16 x, uint16 y, const char dat[]);

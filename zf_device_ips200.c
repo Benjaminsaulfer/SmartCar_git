@@ -496,6 +496,10 @@ void ips200_set_color (const uint16 pen, const uint16 bgcolor)
     ips200_bgcolor = bgcolor;
 }
 
+void    ips200_pen_color (const uint16 pen){
+  ips200_pencolor = pen;
+}
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     IPS200 画点
 // 参数说明     x               坐标x方向的起点 [0, ips200_width_max-1]
