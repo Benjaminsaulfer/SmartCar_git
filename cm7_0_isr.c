@@ -35,20 +35,19 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "trace.h"
 
 extern float m7_1_data[20];
-#define EncoderL m7_1_data[4]
-#define EncoderR m7_1_data[5] 
+#define motor_flag m7_1_data[2]//电机标志位 
+extern Rectangle_Struct REC;//矩形结构体
+extern uint8 otsu_enable;
 
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH0);
-
-    
-    //计算左右轮速度
-    //speedL = 0.0073631*EncoderL;//2*3.141592*EncoderL*0.012/0.01/1024
-    //speedR = 0.0073631*EncoderR;//2*3.141592*EncoderL*0.012/0.01/1024
+    pit_disable(PIT_CH0);//关闭定时器中断
+    otsu_enable = 1;//重新恢复大津法
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
