@@ -62,11 +62,11 @@ fifo_struct uart_data_fifo;
 uint32_t M0_speed;
 uint16 ArrowPos = 128;//arrow position
 int8 threshold_add = 0;//曝光度 
-uint16 motor_base = 1400;//电机初始速度
-uint8 PID_ = 0;//第几个PID
+uint16 motor_base = 400;//电机初始速度
+int8 PID_ = 0;//第几个PID
 uint32_t CPU_Speed=0;
 ////////标志位////////
-uint8 otsu_enable = 1;
+
 
 ////////编码器////////
 int16 Max_encoderL = 0;//编码器最大速度
@@ -97,17 +97,37 @@ void key_even(){
     if(gpio_get_level(P06_1) == 0){//如果电机关闭
       switch(ArrowPos){
          case 128://PID选择
-           if(gpio_get_level(P20_0) == 0) PID_= 0;
-            if(gpio_get_level(P20_3) == 0)PID_ = 1;
+           if(gpio_get_level(P20_0) == 0) {
+             while(gpio_get_level(P20_0)==0); 
+             PID_++;
+           }
+           if(gpio_get_level(P20_3) == 0){
+             while(gpio_get_level(P20_3)==0);
+             PID_--;
+           }
+            if(PID_>=4)PID_ = 3;
+            else if (PID_<= 0)PID_ = 0;
             break;
          case 136://Kp
            if(gpio_get_level(P20_0) == 0){
+             if(PID_==2||PID_==3){
+              if(PID_==2)PID_Speed_L.Kp+=0.1;
+              else PID_Speed_R.Kp+=0.1;   
+             }
+             else{
               if(PID_==0)PID_Steering.Kp+=5;
-              else PID_Steering_turn.Kp+=5;
+              else PID_Steering_turn.Kp+=5;   
+             }
            }
            if(gpio_get_level(P20_3) == 0){
-              if(PID_==0)PID_Steering.Kp-=5;
+             if(PID_==2||PID_==3){
+              if(PID_==2)PID_Speed_L.Kp-=0.1;
+              else PID_Speed_R.Kp-=0.1;   
+             }
+             else {      
+             if(PID_==0)PID_Steering.Kp-=5;
               else PID_Steering_turn.Kp-=5;
+             }
            }
             break;
          case 144://Ki
@@ -166,6 +186,8 @@ void Scrren_Init(){
     ips200_Printf(0,176,(ips200_font_size_enum)0,"motor:");// 电机使能
     ips200_Printf(0,216,(ips200_font_size_enum)0,"Linepid:");//显示PID转向环
     ips200_Printf(0,224,(ips200_font_size_enum)0,"Turnpid:");//显示PID转向环
+    ips200_Printf(0,280,(ips200_font_size_enum)0,"targetL:");//显示L边电机pwm值
+    ips200_Printf(122,280,(ips200_font_size_enum)0,"targetR:");//显示L边电机pwm值
     ips200_Printf(0,288,(ips200_font_size_enum)0,"EncoderL:");//左边编码器值
     ips200_Printf(120,288,(ips200_font_size_enum)0,"EncoderR:");//右边编码器值
     ips200_Printf(0,300,(ips200_font_size_enum)0,"M1:");       //第一个核心的速度
@@ -205,16 +227,17 @@ int main(void)
     encoder_quad_init(TC_CH20_ENCODER, TC_CH20_ENCODER_CH1_P08_1, TC_CH20_ENCODER_CH2_P08_2);
     
     //PID初始化
-    PID_init(&PID_Steering,600,0,200,0);//直线PID
-    PID_init(&PID_Steering_turn,1000,0,2,0);//弯道PID
-    PID_init(&PID_Speed_L,12,0.5,6,Encoder_speed(10));//左电机闭环,你可以设置的目标值,最大Encoder_speed 100
-    PID_init(&PID_Speed_R,12,0.5,6,Encoder_speed(10));//右电机闭环,你可以设置的目标值,最大为Encoder_speed 100
+    PID_init(&PID_Steering,95,0,200,0);//直线PID
+    PID_init(&PID_Steering_turn,450,0,2,0);//弯道PID
+    PID_init(&PID_Speed_L,18.0,0.5,0,motor_base);//左电机闭环,你可以设置的目标值,最大Encoder_speed 100
+    PID_init(&PID_Speed_R,18.0,0.6,0,motor_base);//右电机闭环,你可以设置的目标值,最大为Encoder_speed 100
 
     //定时器中断
     pit_ms_init(PIT_CH0, 10);//初始化 PIT0 为周期中断 10ms
     //屏幕初始化
     Scrren_Init();
     adc_init(ADC0_CH00_P06_0, ADC_12BIT); //检测电池电压
+    
     while(true)
     {
         timer_clear(TC_TIME2_CH0) ;
@@ -223,13 +246,14 @@ int main(void)
         thread++;
         //Encoder_Test();//用于编码器测试,取消注释之后，电机马上以最大速度前进，并且记录下编码器的最大速度,并打印出来
         ///////////////////////////////////////////测速区间/////////////////////////////////////////////////
-     
+        
         
         ////////////////////循迹方案////////////////////
-        if(thread%2 && otsu_enable){
+        if(thread%2){
           threshold = S_GetOSTU(mt9v03x_image) + threshold_add;//大津法自适应算法5ms
           thread = 0;
         }
+        
         binarizeImage(2,threshold);
         //Trace_middleLine();//普通扫线
         //Trace_Eight_fields_new();//优化八邻域
@@ -245,10 +269,19 @@ int main(void)
               ips200_Printf(20,136,(ips200_font_size_enum)0,"%.1f ",PID_Steering.Kp);//kp
               ips200_Printf(20,144,(ips200_font_size_enum)0,"%.1f ",PID_Steering.Ki);//ki
               ips200_Printf(20,152,(ips200_font_size_enum)0,"%.1f ",PID_Steering.Kd);//kd
-            }else{
+            }else if(PID_==1){
               ips200_Printf(20,136,(ips200_font_size_enum)0,"%.1f ",PID_Steering_turn.Kp);//kp
               ips200_Printf(20,144,(ips200_font_size_enum)0,"%.1f ",PID_Steering_turn.Ki);//ki
               ips200_Printf(20,152,(ips200_font_size_enum)0,"%.1f ",PID_Steering_turn.Kd);//kd
+            }else if(PID_==2){
+              ips200_Printf(20,136,(ips200_font_size_enum)0,"%.1f ",PID_Speed_L.Kp);//kp
+              ips200_Printf(20,144,(ips200_font_size_enum)0,"%.1f ",PID_Speed_L.Ki);//ki
+              ips200_Printf(20,152,(ips200_font_size_enum)0,"%.1f ",PID_Speed_L.Kd);//kd
+            }
+            else if(PID_==3){
+              ips200_Printf(20,136,(ips200_font_size_enum)0,"%.1f ",PID_Speed_R.Kp);//kp
+              ips200_Printf(20,144,(ips200_font_size_enum)0,"%.1f ",PID_Speed_R.Ki);//ki
+              ips200_Printf(20,152,(ips200_font_size_enum)0,"%.1f ",PID_Speed_R.Kd);//kd
             }
             ips200_Printf(36,160,(ips200_font_size_enum)0,"%d ",threshold);//摄像头曝光度
             ips200_Printf(28,168,(ips200_font_size_enum)0,"%d ",motor_base);//电机初始速度
@@ -274,22 +307,20 @@ int main(void)
                   CPU_Speed+=Speed_array[k];
                 once_flag = 0;
             }
-
         }
-       
-        static float Last_Error = 0;
+        
+        static float Last_Pid_OUT;
         if((REC.R + REC.L + REC.RR + REC.LL) >=340){//过曝停车
           gpio_set_level(P06_1,0);
         }
         else if(REC.LL <= 3 && REC.RR <= 3 && (REC.R + REC.L)>=4){//直线转向环
-          //Steering_FeedBack(&PID_Steering,Sum_of_Dif_near(REC.L,REC.R));
           Cascade_FeedBack(&PID_Steering,&PID_Speed_L,&PID_Speed_R,Sum_of_Dif_near(REC.L,REC.R));//串级PID
           gpio_set_level(P19_4,0);
         }
         else if(REC.LL > 3 || REC.RR > 3){//弯道转向环
           ips200_Printf(126,186,(ips200_font_size_enum)0,"error:%.2f ",Sum_of_Dif(REC.L,REC.R,REC.LL,REC.RR));
           //Steering_FeedBack(&PID_Steering_turn,Sum_of_Dif(REC.L,REC.R,REC.LL,REC.RR));
-          Cascade_FeedBack(&PID_Steering,&PID_Speed_L,&PID_Speed_R,Sum_of_Dif(REC.L,REC.R,REC.LL,REC.RR));//串级PID
+          Cascade_FeedBack(&PID_Steering_turn,&PID_Speed_L,&PID_Speed_R,Sum_of_Dif(REC.L,REC.R,REC.LL,REC.RR));//串级PID
           //Last_Error = Sum_of_Dif(REC.L,REC.R,REC.LL,REC.RR);//记录下这次的误差
           //gpio_set_level(P19_4,1);
         }
@@ -297,14 +328,25 @@ int main(void)
           //gpio_set_level(P19_4,0);//丢线警报
           //Steering_FeedBack(&PID_Steering_turn,Last_Error);//使用上一次的误差
         }
-    
+        
         //Speed_FeedBack(&PID_Speed_R,Right);//右电机速度环
         //Speed_FeedBack(&PID_Speed_L,Left);//左电机速度环
-        //Cascade_FeedBack(&PID_Steering,&PID_Speed_L,&PID_Speed_R);//串级PID
-        
+       // printf("%d,%d\n",EncoderL,EncoderR);
+        //printf("%d,%d,%d\n",motor_base,EncoderL*20,EncoderR*20);
+        //printf("%d,%.2f,%.2f\n",motor_base,PID_Speed_R.OUT,PID_Speed_L.OUT);
+
         /////////////////////////////////////////测速区间/////////////////////////////////////////////////
         SCB_CleanInvalidateDCache_by_Addr(&m7_1_data, sizeof(m7_1_data));//更新RAM区数据
         M0_speed = timer_get(TC_TIME2_CH0);//获取第一个核心的运行时间
         timer_stop(TC_TIME2_CH0);
+    }
+}
+
+void uart_rx_interrupt_handler (void)
+{
+//    get_data = uart_read_byte(UART_INDEX);                                      // 接收数据 while 等待式 不建议在中断使用
+    if(uart_query_byte(UART_INDEX, &get_data))                                  // 接收数据 查询式 有数据会返回 TRUE 没有数据会返回 FALSE
+    {
+        fifo_write_buffer(&uart_data_fifo, &get_data, 1);                       // 将数据写入 fifo 中
     }
 }

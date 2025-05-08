@@ -45,10 +45,20 @@ float m7_1_data[20] = {0};
 #define Battery_V m7_1_data[3]
 
 void Baterry_ChecK(){
-  if(Battery_V>= 6  &&  Battery_V <= 7.3 )//对于2S电池而言(6~732警告)
-    gpio_toggle_level(P19_4);
-  else if(Battery_V >= 9  &&  Battery_V <= 10.8 )//对于3S电池而言9~10.8警告)
-    gpio_toggle_level(P19_4);
+  if(Battery_V>= 6  &&  Battery_V <= 7.3 ){//对于2S电池而言(6~732警告)
+    for(uint8_t i = 0;i<10;i++){
+      gpio_toggle_level(P19_4);
+      system_delay_ms(100);
+    }
+  }
+    
+  else if(Battery_V >= 9  &&  Battery_V <= 10.8 ){
+    for(uint8_t i = 0;i<10;i++){
+      gpio_toggle_level(P19_4);
+      system_delay_ms(100);
+    }
+  }//对于3S电池而言9~10.8警告)
+  gpio_set_level(P19_4,0);
 }
 
 int main(void)
@@ -77,7 +87,6 @@ int main(void)
         Baterry_ChecK();                                                  //检测电池电压
         ///////////////////////////////////////测速区间///////////////////////////////////////////
         Battery_V = (float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1;
-
         
         //////////////////////////////////////测速区间//////////////////////////////////////////
         M1_speed = timer_get(TC_TIME2_CH1);
