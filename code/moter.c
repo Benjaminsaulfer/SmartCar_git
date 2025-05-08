@@ -8,8 +8,6 @@ extern uint16_t motor_base;
 extern int16 Max_encoderL;//编码器最大速度
 extern int16 Max_encoderR;
 
-extern uint8 motor_flag;
-
 //电机初始化
 void  moter_init(){
     gpio_init(P10_2,GPO,0,GPO_PUSH_PULL);
@@ -104,13 +102,8 @@ void   Steering_FeedBack(PID * pid,float Error){
   if(Linput>=10000)Linput = 10000;
   else if(Linput<=0)Linput=0;
   //把PID输出值传入PWM
-  if(motor_flag == 1.0f){
-    pwm_set_duty(MoterR, Rinput);
-    pwm_set_duty(MoterL, Linput);
-  }else{
-    pwm_set_duty(MoterR, 0);
-    pwm_set_duty(MoterL, 0);
-  }
+  pwm_set_duty(MoterR, Rinput);
+  pwm_set_duty(MoterL, Linput);
 }
 
 //速度环
@@ -139,20 +132,25 @@ PID * SteeringPID 转向环pid对象
 PID * SpeedPID_L 左速度环pid对象
 PID * SpeedPID_R 右速度环pid对象
 */
-void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R){
+void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R,float Error){
   static float basic_Speed;
   static uint8_t once_flag = 1;
   if(once_flag){//只执行一次，记录下当基础速度
       basic_Speed = SpeedPID_L->target;
       once_flag = 0;
   }
-  
   //转向环输出，pid输出记录在SteeringPID->OUT
-  PID_location(SteeringPID,remenber_point);//转向环进行输出
+  PID_location(SteeringPID,Error);//转向环进行输出
   
   //速度环接收来自转向环的参数,修改掉速度环的目标值(期望值)
-  SpeedPID_L->target = basic_Speed - SteeringPID->OUT;//基础速度 + SteeringPID->OUT
-  SpeedPID_R->target = basic_Speed + SteeringPID->OUT;//基础速度 - SteeringPID->OUT
+  SpeedPID_L->target = basic_Speed - SteeringPID->OUT/20;//基础速度 + SteeringPID->OUT
+  SpeedPID_R->target = basic_Speed + SteeringPID->OUT/20;//基础速度 - SteeringPID->OUT
+  
+  if(SpeedPID_L->target >500)SpeedPID_L->target = 500;
+  else if (SpeedPID_L->target <=0)SpeedPID_L->target =0;
+  if(SpeedPID_R->target >500)SpeedPID_R->target = 500;
+  else if (SpeedPID_R->target <=0)SpeedPID_R->target =0;
+  
   
   //速度环进行计算，pid输出记录在SpeedPID_L->OUT 和 SpeedPID_R->OUT
   PID_Increse(SpeedPID_L,EncoderL);
@@ -165,13 +163,9 @@ void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R){
   else if(SpeedPID_R <=0)SpeedPID_R = 0;
   
   //将速度环pidOUT分别输出在电机上
-  if(motor_flag == 1.0f){
-    pwm_set_duty(MoterR, (uint16_t)SpeedPID_L->OUT);
-    pwm_set_duty(MoterL, (uint16_t)SpeedPID_R->OUT);
-  }else{
-    pwm_set_duty(MoterR,0);
-    pwm_set_duty(MoterL,0);
-  }
+  pwm_set_duty(MoterR, (uint16_t)SpeedPID_L->OUT);
+  pwm_set_duty(MoterL, (uint16_t)SpeedPID_R->OUT);
+
   /////////////////用于测试/////////////////
   static uint8_t onec_flag2 = 1;
   if(onec_flag2){
@@ -199,7 +193,7 @@ void Encoder_Get_Max(int16* Encoder_L,int16* Encoder_R){
 }
 
 void Encoder_Test(){//适用于测试
-   motor_flag = 1;
+   gpio_set_level(P06_1,1);
    //ips200_Printf(0,166,(ips200_font_size_enum)0,"   SpeedL:%.2f ",speedL);
    //ips200_Printf(120,166,(ips200_font_size_enum)0," SpeedR:%.2f ",speedR);
    ips200_Printf(0,240,(ips200_font_size_enum)0,"Max_L:%d",Max_encoderL);//显示左编码器最大值
