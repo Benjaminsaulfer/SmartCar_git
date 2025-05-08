@@ -42,10 +42,7 @@ float m7_1_data[20] = {0};
 
 #define M0_speed m7_1_data[0]
 #define M1_speed m7_1_data[1]
-#define motor_flag m7_1_data[2]//电机标志位 
 #define Battery_V m7_1_data[3]
-#define EncoderL m7_1_data[4]
-#define EncoderR m7_1_data[5]
 
 void Baterry_ChecK(){
   if(Battery_V>= 6  &&  Battery_V <= 7.3 )//对于2S电池而言(6~732警告)
@@ -65,17 +62,11 @@ int main(void)
     gpio_init(P20_2,GPI,1,GPI_PULL_UP);//按键
     gpio_init(P19_0,GPO,1,GPO_PUSH_PULL);//板子上的灯P19_0
     gpio_init(P19_4,GPO,0,GPO_PUSH_PULL);//蜂鸣器P19_4  
+    gpio_init(P06_1,GPO,0,GPO_PUSH_PULL);//MOter
   
     //定时器初始化
     timer_init(TC_TIME2_CH1, TIMER_US);//打开定时器测速单位us   
     timer_init(TC_TIME2_CH0, TIMER_US);//打开定时器测速单位us   
-
-    //编码器初始化
-    encoder_quad_init(TC_CH07_ENCODER, TC_CH07_ENCODER_CH1_P07_6, TC_CH07_ENCODER_CH2_P07_7);
-    encoder_quad_init(TC_CH20_ENCODER, TC_CH20_ENCODER_CH1_P08_1, TC_CH20_ENCODER_CH2_P08_2);
-    
-    //中断初始化
-    pit_ms_init(PIT_CH0, 10);//初始化 PIT0 为周期中断 10ms
 
     adc_init(ADC0_CH00_P06_0, ADC_12BIT); //检测电池电压
     while(true)
@@ -85,11 +76,8 @@ int main(void)
         SCB_CleanInvalidateDCache_by_Addr(&m7_1_data, sizeof(m7_1_data));//更新RAM数据
         Baterry_ChecK();                                                  //检测电池电压
         ///////////////////////////////////////测速区间///////////////////////////////////////////
-        
         Battery_V = (float)adc_convert(ADC0_CH00_P06_0)/4096 * 3.3*4.1;
-        if(motor_flag == 1){//如果打开了电机
 
-        }
         
         //////////////////////////////////////测速区间//////////////////////////////////////////
         M1_speed = timer_get(TC_TIME2_CH1);

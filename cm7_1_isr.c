@@ -37,20 +37,11 @@
 
 #include "zf_common_headfile.h"
 
-extern float m7_1_data[20];
-#define EncoderL m7_1_data[4]
-#define EncoderR m7_1_data[5] 
-
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH0);
   
-    //编码器测转速
-    EncoderR = encoder_get_count(TC_CH07_ENCODER);
-    encoder_clear_count(TC_CH07_ENCODER);
-    EncoderL = -encoder_get_count(TC_CH20_ENCODER);
-    encoder_clear_count(TC_CH20_ENCODER);
     
 }
 

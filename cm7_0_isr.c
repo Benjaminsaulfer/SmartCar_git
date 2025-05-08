@@ -37,17 +37,24 @@
 #include "zf_common_headfile.h"
 #include "trace.h"
 
-extern float m7_1_data[20];
-#define motor_flag m7_1_data[2]//电机标志位 
-extern Rectangle_Struct REC;//矩形结构体
 extern uint8 otsu_enable;
+extern int16 EncoderL;
+extern int16 EncoderR;
 
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
-    pit_isr_flag_clear(PIT_CH0);
+  
+    pit_isr_flag_clear(PIT_CH0);/*
     pit_disable(PIT_CH0);//关闭定时器中断
-    otsu_enable = 1;//重新恢复大津法
+    otsu_enable = 1; //重新恢复大津法
+*/
+    //编码器测转速
+    EncoderR = encoder_get_count(TC_CH07_ENCODER);
+    encoder_clear_count(TC_CH07_ENCODER);
+    EncoderL = -encoder_get_count(TC_CH20_ENCODER);
+    encoder_clear_count(TC_CH20_ENCODER);
+
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
