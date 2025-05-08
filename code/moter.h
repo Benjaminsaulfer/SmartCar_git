@@ -31,7 +31,8 @@ float  PID_location(PID *pid, float current_value);           //位置式PID
 
 ////////////////////////应用型PID/////////////////////////
 void   Steering_FeedBack(PID * pid,float Erro);             //转向环
-void   Speed_FeedBack(PID * pid,Moter_WHO moter);             //速度环
+extern void   Speed_FeedBack(PID * pid,Moter_WHO moter);             //速度环
+
 void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R,float Error);   //串级PID (转向环，速度环)  
 
 /////////////////////////测试用/////////////////////////////

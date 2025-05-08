@@ -96,42 +96,68 @@ void binarizeImage(uint8_t ZIP,uint8 threshold) {
 
 //动态自适应算法:大津法
 //image:传入图像
-uint16_t otsu_threshold(unsigned char *image) {
-    int hist[256] = {0};
-    double sum = 0;
-    double sumB = 0;
-    int wB = 0;
-    int wF = 0;
-    double varMax = 0;
-    int threshold = 0;
-
-    // 计算直方图
-    for (int i = 0; i < 22560; i++)//22560 = 188*120图像大小
-        hist[image[i]]++;
+uint8_t S_GetOSTU(uint8_t tmImage[MT9V03X_H][MT9V03X_W])
+{
+    int16_t i, j;
+    uint32_t Amount = 0;
+    uint32_t PixelBack = 0;
+    uint32_t PixelIntegralBack = 0;
+    uint32_t PixelIntegral = 0;
+    int32_t PixelIntegralFore = 0;
+    int32_t PixelFore = 0;
+    double OmegaBack, OmegaFore, MicroBack, MicroFore, SigmaB, Sigma; // 类间方差;
+    int16_t MinValue, MaxValue;
+    uint8_t Threshold = 0;
+    uint8_t HistoGram[256];
     
-    for (int i = 0; i < 256; i++) // 计算像素值总和
-        sum += i * hist[i];
-
-    for (int t = 0; t < 256; t++) {// 遍历所有可能的阈值
-        wB += hist[t];
-        if (wB == 0) continue;
-        wF = 22560 - wB;
-        if (wF == 0) break;
-
-        sumB += t * hist[t];
-        double mB = sumB / wB;
-        double mF = (sum - sumB) / wF;
-
-        double varBetween = (double)wB * (double)wF * (mB - mF) * (mB - mF);
-
-        if (varBetween > varMax) {
-            varMax = varBetween;
-            threshold = t;
+    for (j = 0; j < 256; j++)  
+      HistoGram[j] = 0; //初始化灰度直方图
+    
+    for (j = 0; j < MT9V03X_H; j++)
+    {
+        for (i = 0; i <MT9V03X_W; i++)
+        {
+            HistoGram[tmImage[j][i]]++; //统计灰度级中每个像素在整幅图像中的个数
         }
     }
 
-    return threshold;
+    for (MinValue = 0; MinValue < 256 && HistoGram[MinValue] == 0; MinValue++);        //获取最小灰度的值
+    for (MaxValue = 255; MaxValue > MinValue && HistoGram[MinValue] == 0; MaxValue--); //获取最大灰度的值
+
+    if (MaxValue == MinValue)     
+      return (uint8)MaxValue;         // 图像中只有一个颜色
+    if (MinValue + 1 == MaxValue)  
+      return (uint8)MinValue;        // 图像中只有二个颜色
+
+    for (j = MinValue; j <= MaxValue; j++)    
+      Amount += HistoGram[j];        //  像素总数
+
+    PixelIntegral = 0;
+    for (j = MinValue; j <= MaxValue; j++)
+    {
+        PixelIntegral += HistoGram[j] * j;//灰度值总数
+    }
+    SigmaB = -1;
+    for (j = MinValue; j < MaxValue; j++)
+    {
+        PixelBack = PixelBack + HistoGram[j];    //前景像素点数
+        PixelFore = Amount - PixelBack;         //背景像素点数
+        OmegaBack = (double)PixelBack / Amount;//前景像素百分比
+        OmegaFore = (double)PixelFore / Amount;//背景像素百分比
+        PixelIntegralBack += HistoGram[j] * j;  //前景灰度值
+        PixelIntegralFore = PixelIntegral - PixelIntegralBack;//背景灰度值
+        MicroBack = (double)PixelIntegralBack / PixelBack;   //前景灰度百分比
+        MicroFore = (double)PixelIntegralFore / PixelFore;   //背景灰度百分比
+        Sigma = OmegaBack * OmegaFore * (MicroBack - MicroFore) * (MicroBack - MicroFore);//计算类间方差
+        if (Sigma > SigmaB)                    //遍历最大的类间方差g //找出最大类间方差以及对应的阈值
+        {
+            SigmaB = Sigma;
+            Threshold = (uint8)j;
+        }
+    }
+    return Threshold;                        //返回最佳阈值;
 }
+
 ////////////////////////////////////循迹方案////////////////////////////////////////////////
 //普通扫线
 void Trace_middleLine(){
@@ -284,7 +310,7 @@ float Sum_of_Dif(float L1,float R1,float L2,float R2){
   static float weight = 2.5;
   if((L1 + R1 + L2 + R2)==0)return 0;//如果分母为0
   //return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight) + turn_plus(L2,R2);
-  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight);
+  return ((R1 + R2*weight) - (L1 + L2*weight)) / (L1 + R1 + L2*weight + R2*weight); 
 }
 
 float Sum_of_Dif_near(float L1,float R1){

@@ -39,30 +39,10 @@ PID*             传入PID的结构体
 current_value    编码器的测到的实际速度
 */
 float  PID_Increse(PID* pid,float current_value){
-  /*
-    float output = 0;
-    float error = pid->target - current_value;                  // 当前误差
-    float d_error = error - pid->LastError;                     // 误差的增量
-    float prev_d_error = pid->LastError - pid->PrevError;      // 上一次误差的增量
-    
-    // 控制量的增量 = kp*误差增量 + ki*当前误差 + kd(现在误差增量+上次误差增量)
-    float increment = pid->Kp * d_error + pid->Ki * error + pid->Kd * (d_error - prev_d_error);
-
-    // 更新输出
-    output += increment;
-
-    // 更新误差记录
-    pid->PrevError = pid->LastError;
-    pid->LastError = error;
-    
-    return output;
-*/
     float error = pid->target - current_value;
     pid->PrevError += error;
     //积分限幅
-    if(pid->target >=225 && pid->PrevError>= 5000)pid->PrevError = 5000;//积分限幅
-    else if(pid->target >=30 && pid->target <225 && pid->PrevError>= 12000)pid->PrevError = 12000;//积分限幅
-    else if(pid->target <30 && pid->PrevError>= 18000)pid->PrevError = 18000;//积分限幅
+    if(pid->PrevError>= 4000)pid->PrevError = 4000;//积分限幅
     float derivative = error - pid->LastError;
     pid->LastError = error;
     pid->OUT =  pid->Kp * error + pid->Ki * pid->PrevError + pid->Kd * derivative;
@@ -110,20 +90,14 @@ void   Steering_FeedBack(PID * pid,float Error){
 void   Speed_FeedBack(PID * pid,Moter_WHO moter){
   //用于测试
   if(moter == Left){//如果是左电机
-    uint16_t input = (uint16_t)(pid->target / Max_encoder * 10000);
-    if(input>=10000)input = 10000;
-    else if(input <=0)input = 0;
-    pwm_set_duty(MoterL,  (uint32)(input + PID_Increse(pid,EncoderL)));
+    pwm_set_duty(MoterL,  (uint32)(PID_Increse(pid,EncoderL*20)));
     ips200_Printf(0,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
-    ips200_Printf(0,272,(ips200_font_size_enum)0,"pid:%d ",(int)PID_Increse(pid,EncoderL));//pid输出值
+    ips200_Printf(0,272,(ips200_font_size_enum)0,"pid:%.0f ",pid->OUT);//pid输出值
   }
   else{//如果是右电机
-    uint16_t input = (uint16_t)(pid->target / Max_encoder * 10000);
-    if(input>=10000)input = 10000;
-    else if(input <=0)input = 0;
-    pwm_set_duty(MoterR,  (uint32)(input + PID_Increse(pid,EncoderR)));
+    pwm_set_duty(MoterR,  (uint32)(PID_Increse(pid,EncoderR*20)));
     ips200_Printf(120,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
-    ips200_Printf(120,272,(ips200_font_size_enum)0,"pid:%d ",(int)PID_Increse(pid,EncoderR));//pid输出值
+    ips200_Printf(120,272,(ips200_font_size_enum)0,"pid:%.0f ",pid->OUT);//pid输出值
   }
 }
 
@@ -133,48 +107,33 @@ PID * SpeedPID_L 左速度环pid对象
 PID * SpeedPID_R 右速度环pid对象
 */
 void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R,float Error){
-  static float basic_Speed;
-  static uint8_t once_flag = 1;
-  if(once_flag){//只执行一次，记录下当基础速度
-      basic_Speed = SpeedPID_L->target;
-      once_flag = 0;
-  }
+   float basic_Speed = motor_base;
+
   //转向环输出，pid输出记录在SteeringPID->OUT
   PID_location(SteeringPID,Error);//转向环进行输出
-  
+  ips200_Printf(130,260,(ips200_font_size_enum)0,"trun:%.0f ",SteeringPID->OUT);//显示L边电机pwm值
   //速度环接收来自转向环的参数,修改掉速度环的目标值(期望值)
-  SpeedPID_L->target = basic_Speed - SteeringPID->OUT/20;//基础速度 + SteeringPID->OUT
-  SpeedPID_R->target = basic_Speed + SteeringPID->OUT/20;//基础速度 - SteeringPID->OUT
-  
-  if(SpeedPID_L->target >500)SpeedPID_L->target = 500;
-  else if (SpeedPID_L->target <=0)SpeedPID_L->target =0;
-  if(SpeedPID_R->target >500)SpeedPID_R->target = 500;
-  else if (SpeedPID_R->target <=0)SpeedPID_R->target =0;
-  
+  SpeedPID_L->target = basic_Speed - SteeringPID->OUT;//基础速度 + SteeringPID->OUT
+  SpeedPID_R->target = basic_Speed + SteeringPID->OUT;//基础速度 - SteeringPID->OUT
   
   //速度环进行计算，pid输出记录在SpeedPID_L->OUT 和 SpeedPID_R->OUT
-  PID_Increse(SpeedPID_L,EncoderL);
-  PID_Increse(SpeedPID_R,EncoderR);
+  PID_Increse(SpeedPID_L,EncoderL*20);
+  PID_Increse(SpeedPID_R,EncoderR*20);
   
   //Protect占空比保护
   if(SpeedPID_L->OUT >=10000)SpeedPID_L->OUT  = 10000;
-  else if(SpeedPID_L <=0)SpeedPID_L = 0;
+  else if(SpeedPID_L->OUT <=0)SpeedPID_L->OUT = 0;
   if(SpeedPID_R->OUT >=10000)SpeedPID_R->OUT  = 10000;
-  else if(SpeedPID_R <=0)SpeedPID_R = 0;
+  else if(SpeedPID_R->OUT <=0)SpeedPID_R->OUT = 0;
   
   //将速度环pidOUT分别输出在电机上
-  pwm_set_duty(MoterR, (uint16_t)SpeedPID_L->OUT);
-  pwm_set_duty(MoterL, (uint16_t)SpeedPID_R->OUT);
+  pwm_set_duty(MoterL, (uint16_t)SpeedPID_L->OUT);
+  pwm_set_duty(MoterR, (uint16_t)SpeedPID_R->OUT);
 
   /////////////////用于测试/////////////////
-  static uint8_t onec_flag2 = 1;
-  if(onec_flag2){
-    ips200_Printf(0,280,(ips200_font_size_enum)0,"pidL_Target:");//显示L边电机pwm值
-    ips200_Printf(120,280,(ips200_font_size_enum)0,"pidR_Target:");//显示L边电机pwm值
-    onec_flag2 = 0;
-  }
-  ips200_Printf(72,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_L->target);//显示L边电机pwm值
-  ips200_Printf(192,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_R->target);//显示L边电机pwm值
+
+  ips200_Printf(52,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_L->target);//显示L边电机pwm值
+  ips200_Printf(172,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_R->target);//显示L边电机pwm值
   /////////////////用于测试/////////////////
 }
 
