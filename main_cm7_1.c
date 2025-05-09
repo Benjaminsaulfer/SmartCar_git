@@ -50,6 +50,7 @@ void Baterry_ChecK(){
       gpio_toggle_level(P19_4);
       system_delay_ms(100);
     }
+    gpio_set_level(P19_4,0);
   }
     
   else if(Battery_V >= 9  &&  Battery_V <= 10.8 ){
@@ -57,8 +58,9 @@ void Baterry_ChecK(){
       gpio_toggle_level(P19_4);
       system_delay_ms(100);
     }
+    gpio_set_level(P19_4,0);
   }//对于3S电池而言9~10.8警告)
-  gpio_set_level(P19_4,0);
+  
 }
 
 int main(void)
