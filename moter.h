@@ -16,16 +16,20 @@ typedef struct {
   float PrevError;     //上上一次误差
   float integral;  // 新增积分项成员
   float OUT;
+  float current;        // 当前值（新增）
+  float error;          // 当前误差（新增）
 }PID;
 
 void   moter_init();//电机初始化
-void   Check_Stop();
+/////////////////////////电机启动函数//////////////////////////
+void exponentialRamp(int targetPwm, int durationMs, int stepIntervalMs);
+void sCurveRamp(pwm_channel_enum moter, int targetPwm, int durationMs, int stepIntervalMs);
+
 /////////////////////////滤波器////////////////////////////
 float sliding_window_filter(int window_size, float input, float *history, int *index);//滑动窗口滤波
 
 ///////////////////////底层PID函数////////////////////////
 void   PID_init(PID* pid,float Kp,float Ki,float Kd,float target);
-float  PID_Increse(PID* pid,float current_value);             //增加量式PID
 float  PID_location(PID *pid, float current_value);           //位置式PID
 
 ////////////////////////应用型PID/////////////////////////
