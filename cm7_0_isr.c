@@ -36,29 +36,28 @@
 
 #include "zf_common_headfile.h"
 #include "trace.h"
-#include "moter.h"
+
 extern uint8 otsu_enable;
 extern int16 EncoderL;
 extern int16 EncoderR;
-extern int16 motor_base;
-extern PID PID_Speed_R;//右边电机
-extern PID PID_Speed_L;//左边电机
+
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
-  
-    pit_isr_flag_clear(PIT_CH0);/*
-    pit_disable(PIT_CH0);//关闭定时器中断
-    otsu_enable = 1; //重新恢复大津法
-*/
-    //编码器测转速
+    pit_isr_flag_clear(PIT_CH0);
+    //EncoderR = encoder_get_count(TC_CH07_ENCODER);
+    static int16_t Last_EncoderR=0;
     EncoderR = encoder_get_count(TC_CH07_ENCODER);
+    EncoderR =(EncoderR + Last_EncoderR)/2;
+    Last_EncoderR = EncoderR;
     encoder_clear_count(TC_CH07_ENCODER);
+    
+    //EncoderL = -encoder_get_count(TC_CH20_ENCODER);
+    static int16_t Last_EncoderL=0;
     EncoderL = -encoder_get_count(TC_CH20_ENCODER);
+    EncoderL =(EncoderL + Last_EncoderL)/2;
+    Last_EncoderL = EncoderL; 
     encoder_clear_count(TC_CH20_ENCODER);
-   // Speed_FeedBack(&PID_Speed_R,Right);//右电机速度环
-   // Speed_FeedBack(&PID_Speed_L,Left);//左电机速度环
-    //printf("%d,%d,%d\n",motor_base,EncoderL*20,EncoderR*20);
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
@@ -349,13 +348,12 @@ void gpio_23_exti_isr()                  // 外部 GPIO_23 中断服务函数
 
 // **************************** 串口中断函数 ****************************
 // 串口0默认作为调试串口
-void uart_rx_interrupt_handler (void);
 void uart0_isr (void)
 {
     if(Cy_SCB_GetRxInterruptMask(get_scb_module(UART_0)) & CY_SCB_UART_RX_NOT_EMPTY)            // 串口0接收中断
     {
         Cy_SCB_ClearRxInterrupt(get_scb_module(UART_0), CY_SCB_UART_RX_NOT_EMPTY);              // 清除接收中断标志位
-         uart_rx_interrupt_handler();
+        
 #if DEBUG_UART_USE_INTERRUPT                        				                // 如果开启 debug 串口中断
         debug_interrupr_handler();                  				                // 调用 debug 串口接收处理函数 数据会被 debug 环形缓冲区读取
 #endif                                              				                // 如果修改了 DEBUG_UART_INDEX 那这段代码需要放到对应的串口中断去
