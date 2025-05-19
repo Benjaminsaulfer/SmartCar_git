@@ -36,34 +36,52 @@
 
 #include "zf_common_headfile.h"
 #include "trace.h"
+#include "imu660.h"
 
 extern uint8 otsu_enable;
 extern int16 EncoderL;
 extern int16 EncoderR;
 
+#define WINDOW_SIZE 3
+int16_t filterR[WINDOW_SIZE] = {0};
+int16_t filterR_mindex = 0;
+int16_t filterR_count = 0;
+    
+int16_t filterL[WINDOW_SIZE] = {0};
+int16_t filterL_mindex = 0;
+int16_t filterL_count = 0;
+int16_t slidingWindowFilter(int16_t buffer[], int16_t *mindex, int16_t *count, int16_t input) {
+    int32_t sum = 0;
+    buffer[*mindex] = input;
+    *mindex = (*mindex + 1) % WINDOW_SIZE;
+    if (*count < WINDOW_SIZE)
+        (*count)++;
+    for (int i = 0; i < *count; i++)
+        sum += buffer[i];
+    return (int16_t)(sum / *count);
+}
+
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH0);
-    //EncoderR = encoder_get_count(TC_CH07_ENCODER);
-    static int16_t Last_EncoderR=0;
-    EncoderR = encoder_get_count(TC_CH07_ENCODER);
-    EncoderR =(EncoderR + Last_EncoderR)/2;
-    Last_EncoderR = EncoderR;
-    encoder_clear_count(TC_CH07_ENCODER);
     
-    //EncoderL = -encoder_get_count(TC_CH20_ENCODER);
-    static int16_t Last_EncoderL=0;
+    EncoderR = encoder_get_count(TC_CH07_ENCODER);
+    EncoderR = slidingWindowFilter(
+        filterR, &filterR_mindex, &filterR_count, EncoderR);
+    encoder_clear_count(TC_CH07_ENCODER);
+
     EncoderL = -encoder_get_count(TC_CH20_ENCODER);
-    EncoderL =(EncoderL + Last_EncoderL)/2;
-    Last_EncoderL = EncoderL; 
+    EncoderL = slidingWindowFilter(
+        filterL, &filterL_mindex, &filterL_count, EncoderL);
     encoder_clear_count(TC_CH20_ENCODER);
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH1);
-    
+    get_yaw_angle();
+    //printf("%.2f\n",get_yaw_angle());
 }
 
 void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数      
