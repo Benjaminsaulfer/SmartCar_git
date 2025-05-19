@@ -1,19 +1,109 @@
 #include "zf_common_headfile.h"
 #include "moter.h"
 
-extern uint8 remenber_point;
 extern int16 EncoderL;
 extern int16 EncoderR;
-extern uint16_t motor_base;
-extern int16 Max_encoderL;//编码器最大速度
-extern int16 Max_encoderR;
+extern uint8_t SPEED;
 
 //电机初始化
 void  moter_init(){
     gpio_init(P10_2,GPO,0,GPO_PUSH_PULL);
     gpio_init(P10_3,GPO,0,GPO_PUSH_PULL);
-    pwm_init(MoterL, 1000, 0);//Init_PWM 
-    pwm_init(MoterR, 1000, 0);//Init_PWM
+    pwm_init(MoterL, 17000, 0);//Init_PWM 
+    pwm_init(MoterR, 17000, 0);//Init_PWM
+}
+
+/**
+ * @brief 电机曲线启动函数
+ * @param targetPwm PWM的设置范围0-10000
+ * @param durationMs 启动时间
+ * @param stepIntervalMs 启动间隔
+ */
+void sCurveRamp(int targetPwm, int durationMs, int stepIntervalMs) {
+    int startPwm = 0;
+    int steps = durationMs / stepIntervalMs;
+    
+    for (int i = 0; i < steps; i++) {
+        float progress = (float)i / steps;
+        float sCurveProgress = progress * progress / (progress * progress + (1 - progress) * (1 - progress));
+        int pwmValue = startPwm + (int)((targetPwm - startPwm) * sCurveProgress);
+        
+        printf("%d,%d,%d\n",Encoder_TO_PWM(SPEED),Encoder_TO_PWM(EncoderR),Encoder_TO_PWM(EncoderL));
+        pwm_set_duty(MoterR, pwmValue);
+        pwm_set_duty(MoterL, pwmValue);
+        system_delay_ms(stepIntervalMs);
+    }
+    
+    pwm_set_duty(MoterL, targetPwm);
+    pwm_set_duty(MoterR, targetPwm);
+}
+
+/*////////位置式PID///////////
+PID*             传入PID的结构体
+current_value    编码器的测到的实际速度
+*/
+// 位置式PID计算
+static float PID_location(PID* pid, float current_value) {
+  // 计算当前误差
+  pid->current = current_value;
+  pid->error = pid->target - current_value;
+  
+  // 积分项累加并限幅
+  pid->integral += pid->error;
+  if(gpio_get_level(P06_1)){//如果电机打开
+      if(pid->integral>= 8000)pid->integral = 8000;//积分限幅
+  }else{//如果电机没有打开
+      pid->integral = 0;//不允许弹射起步
+  }
+  // 计算微分项（误差变化率）
+  float derivative = pid->error - pid->LastError;
+  pid->OUT = pid->Kp * pid->error + pid->Ki * pid->integral + pid->Kd * derivative;
+  pid->LastError = pid->error;
+
+  return pid->OUT;
+}
+
+//方向环
+static void   Steering_FeedBack(PID * pid,float Error){
+  static int input = 0;
+  static int Rinput = 0;
+  static int Linput = 0;
+  input = (int)PID_location(pid,Error);
+  Rinput = Encoder_TO_PWM(SPEED)+input;
+  Linput = Encoder_TO_PWM(SPEED)-input;
+  //Protect限位保护
+  if(Rinput>=10000)Rinput = 10000;
+  else if(Rinput<=0)Rinput=0;
+  if(Linput>=10000)Linput = 10000;
+  else if(Linput<=0)Linput=0;
+  //把PID输出值传入PWM
+  pwm_set_duty(MoterR, Rinput);
+  pwm_set_duty(MoterL, Linput);
+}
+
+//速度环
+static void  Speed_FeedBack(PID * pid,uint8_t moter){
+  //用于测试
+  if(moter){//如果是左电机
+    //float filtered = lowPassFilter(PID_location(pid,EncoderL*20),0.2);
+    //pwm_set_duty(MoterL,  (uint32)filtered);
+    uint32_t temp =  Encoder_TO_PWM((uint32_t)PID_location(pid,EncoderL)) + 320;
+    if(temp>=10000)temp = 10000;
+    else if(temp<=0)temp =0;
+    pwm_set_duty(MoterL,  temp);
+    ips200_Printf(0,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
+    ips200_Printf(0,272,(ips200_font_size_enum)0,"now:%d ",EncoderL);//pid输出值
+  }
+  else{//如果是右电机
+    //float filtered = movingAverageFilter(PID_location(pid,EncoderR*20));
+    //pwm_set_duty(MoterR,  (uint32)filtered);
+    uint32_t temp =  Encoder_TO_PWM((uint32_t)PID_location(pid,EncoderR)) + 450;
+    if(temp>=10000)temp = 10000;
+    else if(temp<=0)temp =0;
+    pwm_set_duty(MoterR,  temp);
+    ips200_Printf(120,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
+    ips200_Printf(120,272,(ips200_font_size_enum)0,"now:%d ",EncoderR);//pid输出值
+  }
 }
 
 /*PID_init()初始化函数
@@ -34,130 +124,77 @@ void PID_init(PID* pid,float Kp,float Ki,float Kd,float target){
 }
 
 
-/*////////增量式PID///////////
-PID*             传入PID的结构体
-current_value    编码器的测到的实际速度
-*/
-float  PID_Increse(PID* pid,float current_value){
-    float error = pid->target - current_value;
-    pid->PrevError += error;
-    //积分限幅
-    if(pid->PrevError>= 4000)pid->PrevError = 4000;//积分限幅
-    float derivative = error - pid->LastError;
-    pid->LastError = error;
-    pid->OUT =  pid->Kp * error + pid->Ki * pid->PrevError + pid->Kd * derivative;
-
-    return pid->OUT;
-}
-
-/*
-PID*             传入PID的结构体
-current_value    当前的位置(或者当前误差)
-*/
-float PID_location(PID *pid, float current_value) {
-    float error = pid->target - current_value;  // 当前误差
-    static float integral = 0;//积分项
-    integral += error;         // 积分项累加
-
-    // 输出 = Kp * 当前误差 + Ki *  积分项 + Kd * (这次误差 - 上一次误差)
-    pid->OUT = pid->Kp * error + pid->Ki * integral + pid->Kd * (error - pid->LastError);
-
-    // 更新上一次的误差
-    pid->LastError = error;
-
-    return pid->OUT;
-}
-
-//方向环
-void   Steering_FeedBack(PID * pid,float Error){
-  static int input = 0;
-  static int Rinput = 0;
-  static int Linput = 0;
-  input = (int)PID_location(pid,Error);
-  Rinput = motor_base+input;
-  Linput = motor_base-input;
-  //Protect限位保护
-  if(Rinput>=10000)Rinput = 10000;
-  else if(Rinput<=0)Rinput=0;
-  if(Linput>=10000)Linput = 10000;
-  else if(Linput<=0)Linput=0;
-  //把PID输出值传入PWM
-  pwm_set_duty(MoterR, Rinput);
-  pwm_set_duty(MoterL, Linput);
-}
-
-//速度环
-void   Speed_FeedBack(PID * pid,Moter_WHO moter){
-  //用于测试
-  if(moter == Left){//如果是左电机
-    pwm_set_duty(MoterL,  (uint32)(PID_Increse(pid,EncoderL*20)));
-    ips200_Printf(0,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
-    ips200_Printf(0,272,(ips200_font_size_enum)0,"pid:%.0f ",pid->OUT);//pid输出值
-  }
-  else{//如果是右电机
-    pwm_set_duty(MoterR,  (uint32)(PID_Increse(pid,EncoderR*20)));
-    ips200_Printf(120,280,(ips200_font_size_enum)0,"set:%.0f ",pid->target);//设置的值
-    ips200_Printf(120,272,(ips200_font_size_enum)0,"pid:%.0f ",pid->OUT);//pid输出值
-  }
-}
-
 /*串级PID ， 转向环->速度环
 PID * SteeringPID 转向环pid对象
 PID * SpeedPID_L 左速度环pid对象
-PID * SpeedPID_R 右速度环pid对象
+PID * SpeedPID_R 右速度环pid对象s
 */
 void   Cascade_FeedBack(PID * SteeringPID,PID * SpeedPID_L,PID * SpeedPID_R,float Error){
-   float basic_Speed = motor_base;
-
   //转向环输出，pid输出记录在SteeringPID->OUT
-  PID_location(SteeringPID,Error);//转向环进行输出
-  ips200_Printf(130,260,(ips200_font_size_enum)0,"trun:%.0f ",SteeringPID->OUT);//显示L边电机pwm值
-  //速度环接收来自转向环的参数,修改掉速度环的目标值(期望值)
-  SpeedPID_L->target = basic_Speed - SteeringPID->OUT;//基础速度 + SteeringPID->OUT
-  SpeedPID_R->target = basic_Speed + SteeringPID->OUT;//基础速度 - SteeringPID->OUT
+  PID_location(SteeringPID,Error);//转向环进行输出(PWM值)
+
+  //速度环接收来自转向环的参数,重置速度环的目标值
+  SpeedPID_L->target = SPEED*10 - SteeringPID->OUT*0.1;//基础速度 - SteeringPID->OUT(编码器值)
+  SpeedPID_R->target = SPEED*10 + SteeringPID->OUT*0.1;//基础速度 + SteeringPID->OUT(编码器值)
   
-  //速度环进行计算，pid输出记录在SpeedPID_L->OUT 和 SpeedPID_R->OUT
-  PID_Increse(SpeedPID_L,EncoderL*20);
-  PID_Increse(SpeedPID_R,EncoderR*20);
+  //速度环进行计算，确保两边轮子的确以转向环的误差旋转(编码器值)
+  PID_location(SpeedPID_L,EncoderL);
+  PID_location(SpeedPID_R,EncoderR);
   
-  //Protect占空比保护
-  if(SpeedPID_L->OUT >=10000)SpeedPID_L->OUT  = 10000;
-  else if(SpeedPID_L->OUT <=0)SpeedPID_L->OUT = 0;
-  if(SpeedPID_R->OUT >=10000)SpeedPID_R->OUT  = 10000;
-  else if(SpeedPID_R->OUT <=0)SpeedPID_R->OUT = 0;
+  //Protect占空比保护已经偏移
+  uint32_t MoterL_duty = Encoder_TO_PWM((uint32_t)PID_location(SpeedPID_L,EncoderL)) + 320;//编码器值->PWM
+  uint32_t MoterR_duty = Encoder_TO_PWM((uint32_t)PID_location(SpeedPID_R,EncoderR)) + 450;//编码器值->PWM
+  if(MoterL_duty >=10000)MoterL_duty  = 10000;
+  else if(MoterL_duty <=0)MoterL_duty = 0;
+  if(MoterR_duty >=10000)MoterR_duty  = 10000;
+  else if(MoterR_duty <=0)MoterR_duty = 0;
   
   //将速度环pidOUT分别输出在电机上
-  pwm_set_duty(MoterL, (uint16_t)SpeedPID_L->OUT);
-  pwm_set_duty(MoterR, (uint16_t)SpeedPID_R->OUT);
+  pwm_set_duty(MoterL, MoterL_duty);
+  pwm_set_duty(MoterR, MoterR_duty);
 
   /////////////////用于测试/////////////////
-
-  ips200_Printf(52,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_L->target);//显示L边电机pwm值
-  ips200_Printf(172,280,(ips200_font_size_enum)0,"%.0f ",SpeedPID_R->target);//显示L边电机pwm值
+  //printf("%.2f,%.2f,%.2f\n",SpeedPID_L->target,SpeedPID_R->OUT,SpeedPID_L->OUT);
+  //ips200_Printf(52,280,(ips200_font_size_enum)0,"%d  ",MoterL_duty);//显示L边电机编码器值
+  //ips200_Printf(172,280,(ips200_font_size_enum)0,"%d  ",MoterR_duty);//显示R边电机编码器值
   /////////////////用于测试/////////////////
+}
+
+//////////////////////////////////测试函数////////////////////////////////////////////
+/*传入两个pid的结构体对象*/
+void Encoder_loop_Test(PID * SpeedPID_L,PID * SpeedPID_R){
+    //编码器闭环电机
+    Speed_FeedBack(SpeedPID_L,1);//左电机速度环
+    Speed_FeedBack(SpeedPID_R,0);//右电机速度环
+    printf("%.2f,%.2f,%.2f\n",SpeedPID_L->target,SpeedPID_R->OUT,SpeedPID_L->OUT);
 }
 
 //Encoder_L 和 Encoder_R 分别用来接收编码器的最大值(type int16),上电后电机马上以最大速度运行
-void Encoder_Get_Max(int16* Encoder_L,int16* Encoder_R){
-    static uint8_t onece_flag = 1;
-    if(onece_flag){
-      pwm_set_duty(MoterR, 10000);
-      pwm_set_duty(MoterL, 10000);
-      onece_flag = 0;
-    }
-    if(EncoderL>*Encoder_L)
-      *Encoder_L = EncoderL;
-    if(EncoderR>*Encoder_R)
-      *Encoder_R = EncoderR;
-}
-
 void Encoder_Test(){//适用于测试
-   gpio_set_level(P06_1,1);
+    static uint8_t moter_en = 1;
+    static uint16_t time = 0;
+    static int16 Max_encoderL = 0;//编码器最大速度
+    static int16 Max_encoderR = 0;
+    if(moter_en){//启动电机
+      gpio_set_level(P06_1,1);
+      sCurveRamp(10000, 4000, 20);//曲线启动
+      moter_en = 0;
+    } 
    //ips200_Printf(0,166,(ips200_font_size_enum)0,"   SpeedL:%.2f ",speedL);
    //ips200_Printf(120,166,(ips200_font_size_enum)0," SpeedR:%.2f ",speedR);
    ips200_Printf(0,240,(ips200_font_size_enum)0,"Max_L:%d",Max_encoderL);//显示左编码器最大值
    ips200_Printf(0,248,(ips200_font_size_enum)0,"Max_R:%d",Max_encoderR);//显示右编码器最大值
    ips200_Printf(58,288,(ips200_font_size_enum)0,"%d ",EncoderL);//显示左编码器的值
    ips200_Printf(178,288,(ips200_font_size_enum)0,"%d ",EncoderR);//显示右编码器数字
-   Encoder_Get_Max(&Max_encoderL,&Max_encoderR);
+   
+    if(EncoderL>Max_encoderL)
+      Max_encoderL = EncoderL;
+    if(EncoderR>Max_encoderR)
+      Max_encoderR = EncoderR;
+    time++;
+    if(time>=1000){
+      gpio_set_level(P06_1,0);
+      pwm_set_duty(MoterL, 0);
+      pwm_set_duty(MoterR, 0);
+    }
 }
